@@ -1,5 +1,7 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   HttpException,
   HttpStatus,
@@ -8,17 +10,21 @@ import {
   Put,
   Query,
   Res,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ImagesService } from '../services/images.service';
-import { Response } from 'express';
+import { Express, Response } from 'express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 
 @Controller('api/images')
 export class ImagesControllers {
   constructor(private readonly imagesService: ImagesService) {}
 
-  @Get()
-  async findImages(@Query('num') pageId: string) {
-    const id = parseInt(pageId, 10);
+  @Get('all/:pageId')
+  async findImages(@Param('pageId') pageId: string) {
+    const id = Number(pageId);
+    console.log(id, pageId);
     if (isNaN(id)) {
       throw new HttpException('ID invalide', HttpStatus.BAD_REQUEST);
     }
@@ -49,5 +55,24 @@ export class ImagesControllers {
     @Query('description') description: string,
   ) {
     return this.imagesService.updateDescription(id, description);
+  }
+
+  @Post('upload_image/:pageId')
+  @UseInterceptors(FilesInterceptor('images'))
+  async uploadImage(
+    @Param('pageId') pageId: string,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.imagesService.uploadImage({ pageId: Number(pageId), files });
+  }
+
+  @Delete('delete_image')
+  async deleteImage(@Body() body: { image_id: number; report_id: number }) {
+    return this.imagesService.deleteImage(body.image_id, body.report_id);
+  }
+
+  @Put('reorder')
+  async reorderImages(@Body() body: { images: { id: number }[] }) {
+    return this.imagesService.reorderImages(body.images);
   }
 }

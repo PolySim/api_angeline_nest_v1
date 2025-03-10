@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Page } from '../models/pages.models';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { page_db_to_front } from '../mappers/page.mappers';
 
 @Injectable()
 export class PagesService {
@@ -13,7 +14,7 @@ export class PagesService {
    */
   async getPages() {
     try {
-      return this.prisma.pages.findMany({
+      const pages = await this.prisma.pages.findMany({
         where: {
           display: 1,
           id: {
@@ -24,6 +25,7 @@ export class PagesService {
           sort: 'asc',
         },
       });
+      return page_db_to_front(pages || []);
     } catch (error) {
       throw new HttpException(
         error.message || 'Erreur interne du serveur',
@@ -38,11 +40,15 @@ export class PagesService {
    */
   async getPage(id: number) {
     try {
-      return this.prisma.pages.findFirst({
+      const page = await this.prisma.pages.findFirst({
         where: {
           id,
         },
       });
+      if (!page) {
+        throw new HttpException('Page introuvable', HttpStatus.NOT_FOUND);
+      }
+      return page_db_to_front([page])[0];
     } catch (error) {
       throw new HttpException(
         error.message || 'Erreur interne du serveur',
@@ -87,15 +93,25 @@ export class PagesService {
     }
   }
 
-  async updatePage(page: Page) {
+  async updatePage(page: {
+    id: number;
+    title: string;
+    article: string;
+    status: boolean;
+  }) {
     try {
       return await this.prisma.pages.update({
         where: {
-          id: page.id,
+          id: Number(page.id),
         },
-        data: page,
+        data: {
+          name: page.title,
+          presentation: page.article,
+          display: page.status ? 1 : 0,
+        },
       });
     } catch (error) {
+      console.error(error);
       throw new HttpException(
         error.message || 'Erreur interne du serveur',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -150,7 +166,7 @@ export class PagesService {
         });
         i++;
       }
-      
+
       return { message: 'Pages réordonnées avec succès.' };
     } catch (error) {
       throw new HttpException(

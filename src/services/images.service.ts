@@ -3,6 +3,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import * as path from 'node:path';
 import * as sharp from 'sharp';
 import * as fs from 'node:fs';
+import { Express } from 'express';
+import { ImageDb } from '../models/image.models';
 
 @Injectable()
 export class ImagesService {
@@ -16,6 +18,9 @@ export class ImagesService {
         },
         where: {
           page: Number(pageId),
+        },
+        orderBy: {
+          number: 'asc',
         },
       });
 
@@ -129,6 +134,153 @@ export class ImagesService {
       }
 
       return { message: 'Description mise à jour' };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erreur interne du serveur',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async uploadImage({
+    pageId,
+    files,
+  }: {
+    pageId: number;
+    files: Express.Multer.File[];
+  }) {
+    try {
+      const numberMax = await this.prisma.images
+        .aggregate({
+          where: {
+            page: pageId,
+          },
+          _max: {
+            number: true,
+          },
+        })
+        .then((res) => res._max.number ?? 0);
+
+      const PATH_IMG = process.env.PATH_IMG as string;
+      const directoryPath = path.join(PATH_IMG, 'img', String(pageId));
+      if (!fs.existsSync(directoryPath)) {
+        fs.mkdirSync(directoryPath, { recursive: true });
+      }
+
+      let images: ImageDb[] = [];
+      for (let i = 1; i <= files.length; i++) {
+        const file = files[i - 1];
+
+        let filePath = path.join(directoryPath, file.originalname);
+
+        let counter = 1;
+        const ext = path.extname(file.originalname);
+        const baseName = path.basename(file.originalname, ext);
+        while (fs.existsSync(filePath)) {
+          filePath = `${baseName}-${counter}${ext}`;
+          filePath = path.join(directoryPath, filePath);
+          counter++;
+        }
+
+        await sharp(file.buffer).toFile(filePath);
+
+        const image = await this.prisma.images.create({
+          data: {
+            name:
+              counter === 1
+                ? file.originalname
+                : `${baseName}-${counter - 1}${ext}`,
+            page: pageId,
+            number: numberMax + i,
+          },
+        });
+
+        images = [...images, image];
+      }
+
+      return images;
+    } catch (error) {
+      console.error(error);
+      throw new HttpException(
+        error.message || 'Erreur interne du serveur',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async deleteImage(imageId: number, pageId: number) {
+    try {
+      const imageName = await this.prisma.images
+        .findFirst({
+          where: {
+            id: imageId,
+          },
+        })
+        .then((res) => res?.name);
+
+      if (!imageName) {
+        console.error('Image non trouvée');
+        throw new HttpException('Image non trouvée', HttpStatus.NOT_FOUND);
+      }
+
+      await this.prisma.publication_desc.deleteMany({
+        where: {
+          publicationId: imageId,
+        },
+      });
+
+      await this.prisma.images.deleteMany({
+        where: {
+          id: imageId,
+        },
+      });
+
+      const PATH_IMG = process.env.PATH_IMG as string;
+      const imagePath = path.join(PATH_IMG, 'img', String(pageId), imageName);
+      const blurName = `${imageName.split('.')[0]}.blur.${imageName.split('.')[1]}`;
+      const imagePathBlur = path.join(
+        PATH_IMG,
+        'img',
+        String(pageId),
+        blurName,
+      );
+
+      if (fs.existsSync(imagePath)) {
+        fs.rmSync(imagePath, { recursive: true, force: true });
+      }
+      if (fs.existsSync(imagePathBlur)) {
+        fs.rmSync(imagePathBlur, { recursive: true, force: true });
+      }
+      return {
+        delete: 'success',
+      };
+    } catch (error) {
+      console.error(error);
+      throw new HttpException(
+        error.message || 'Erreur interne du serveur',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async reorderImages(images: { id: number }[]) {
+    try {
+      let i = 1;
+      for (const image of images) {
+        await this.prisma.images.update({
+          where: {
+            id: image.id,
+          },
+          data: {
+            number: i,
+          },
+        });
+        i++;
+      }
+
+      return {
+        reorder: 'success',
+      };
     } catch (error) {
       throw new HttpException(
         error.message || 'Erreur interne du serveur',

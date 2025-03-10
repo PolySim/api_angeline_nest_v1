@@ -6,7 +6,6 @@ import {
   Param,
   Post,
   Put,
-  Query,
 } from '@nestjs/common';
 import { PagesService } from '../services/pages.service';
 import { Page } from '../models/pages.models';
@@ -21,8 +20,8 @@ export class PagesControllers {
   }
 
   @Get(':id')
-  getPage(@Query('id') id: number) {
-    return this.pagesService.getPage(id);
+  getPage(@Param('id') id: string) {
+    return this.pagesService.getPage(Number(id));
   }
 
   @Post()
@@ -31,7 +30,15 @@ export class PagesControllers {
   }
 
   @Put()
-  updatePage(@Body() page: Page) {
+  updatePage(
+    @Body()
+    page: {
+      id: number;
+      title: string;
+      article: string;
+      status: boolean;
+    },
+  ) {
     return this.pagesService.updatePage(page);
   }
 
