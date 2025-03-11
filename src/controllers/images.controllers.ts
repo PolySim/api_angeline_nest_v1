@@ -24,7 +24,6 @@ export class ImagesControllers {
   @Get('all/:pageId')
   async findImages(@Param('pageId') pageId: string) {
     const id = Number(pageId);
-    console.log(id, pageId);
     if (isNaN(id)) {
       throw new HttpException('ID invalide', HttpStatus.BAD_REQUEST);
     }
@@ -51,10 +50,9 @@ export class ImagesControllers {
 
   @Put('update_description')
   async updateDescription(
-    @Query('imageId') id: string,
-    @Query('description') description: string,
+    @Body() data: { description: string; imageId: string },
   ) {
-    return this.imagesService.updateDescription(id, description);
+    return this.imagesService.updateDescription(data.imageId, data.description);
   }
 
   @Post('upload_image/:pageId')

@@ -48,7 +48,7 @@ export class PagesControllers {
   }
 
   @Put('reorder')
-  reorderPages(@Body() indexes: number[]) {
-    return this.pagesService.reorderPages(indexes);
+  reorderPages(@Body() body: { reports: number[] }) {
+    return this.pagesService.reorderPages(body.reports);
   }
 }

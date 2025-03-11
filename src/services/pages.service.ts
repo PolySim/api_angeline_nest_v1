@@ -86,6 +86,7 @@ export class PagesService {
 
       return newPage;
     } catch (error) {
+      console.error('error in createPage', error.message);
       throw new HttpException(
         error.message || 'Erreur interne du serveur',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -169,6 +170,7 @@ export class PagesService {
 
       return { message: 'Pages réordonnées avec succès.' };
     } catch (error) {
+      console.error('Error in reorder', error.message);
       throw new HttpException(
         error.message || 'Erreur interne du serveur',
         HttpStatus.INTERNAL_SERVER_ERROR,
